@@ -16,7 +16,7 @@ use byteorder::{LittleEndian, WriteBytesExt};
 
 //use std::f64::consts::PI;
 use std::fs::File;
-use std::io::{stdout, Read, Write};
+use std::io::{self, stdout, Read, Write};
 //use std::thread;
 //use std::time::Duration;
 
@@ -125,11 +125,15 @@ fn main() {
     }
 }
 
-fn test_rom<P: Read + Write>(port: &mut P, rom: &[u8], rom_addr: u32, packet_index: u32) -> Result<(), fuzzy::Error> {
+fn test_rom<P: Read + Write>(port: &mut P, rom: &[u8], rom_addr: u32, packet_index: u32) -> Result<(), io::Error> {
     print!("({}) issuing rom write command ... ", packet_index);
     stdout().flush().unwrap();
 
-    fuzzy::write_mem_region(port, rom_addr, &rom)?;
+    {
+        let mut remote_mem = fuzzy::RemoteMem::new(port);
+        remote_mem.set_position(rom_addr);
+        remote_mem.write_all(rom)?;
+    }
 
     println!("ok");
 
@@ -144,7 +148,11 @@ fn test_rom<P: Read + Write>(port: &mut P, rom: &[u8], rom_addr: u32, packet_ind
     print!("({}) issuing initial reg write command ... ", packet_index);
     stdout().flush().unwrap();
 
-    fuzzy::write_mem_region(port, initial_regs_addr, &initial_regs_bytes)?;
+    {
+        let mut remote_mem = fuzzy::RemoteMem::new(port);
+        remote_mem.set_position(initial_regs_addr);
+        remote_mem.write_all(&initial_regs_bytes)?;
+    }
 
     println!("ok");
 
@@ -162,7 +170,13 @@ fn test_rom<P: Read + Write>(port: &mut P, rom: &[u8], rom_addr: u32, packet_ind
     print!("({}) issuing read result regs command ... ", packet_index);
     stdout().flush().unwrap();
 
-    let result_regs_bytes = fuzzy::read_mem_region(port, result_regs_addr, 32 * 4)?;
+    let result_regs_bytes = {
+        let mut remote_mem = fuzzy::RemoteMem::new(port);
+        remote_mem.set_position(result_regs_addr);
+        let mut result = vec![0; 32 * 4];
+        remote_mem.read_exact(&mut result)?;
+        result
+    };
 
     println!("ok, result regs: [");
     for i in 0..32 {

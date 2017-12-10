@@ -1,10 +1,31 @@
 use std::io::{self, Read, Write};
+use std::fmt;
+use std::error::Error as StdError;
 
 #[derive(Debug)]
 pub enum Error {
     Io(io::Error),
     DataEmpty,
     DataTooLarge,
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            Error::Io(ref e) => fmt::Display::fmt(e, f),
+            ref other => f.write_str(other.description()),
+        }
+    }
+}
+
+impl StdError for Error {
+    fn description(&self) -> &str {
+        match *self {
+            Error::Io(ref e) => e.description(),
+            Error::DataEmpty => "Data Empty",
+            Error::DataTooLarge => "Data too large",
+        }
+    }
 }
 
 pub fn exchange_packet<P: Read + Write>(port: &mut P, packet: &[u8]) -> Result<Vec<u8>, Error> {
